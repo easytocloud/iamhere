@@ -7,37 +7,77 @@
 
 DEFAULT_IAMHERE_TAG=${DEFAULT_IAMHERE_TAG:-myHomeIP}
 
-TAG=${DEFAULT_IAMHERE_TAG}
-if [ "$#" == 1 ] ; then
-    TAG="${1}"
+NEWIP=$(curl -s http://whatismyip.akamai.com/)/32
+VERBOSE=false
+
+usage() {
+
+  echo "Usage: iamhere [options] [SG-Rule-To-Match]" >&2
+  echo "options: " >&2
+  echo "  -c clear rule IP (allow only 127.0.0.1)" >&2
+  echo "  -v verbose" >&2
+  echo "SG-Rule-To-Match: Description to match in Security Group Rule" >&2
+  echo "                  Defaults to myHomeIP or \${DEFAULT_IAMHERE_TAG}" >&2
+  exit 1
+
+}
+
+## Main ##
+
+while [[ "${1}" == \-* ]] ; do
+  case ${1} in
+  -c) NEWIP=127.0.0.1/32
+      shift
+      ;;
+  -v) VERBOSE=true
+      shift
+      ;;
+  *)  usage
+      exit 1
+  esac
+done
+
+if [ "$#" -gt 1 ] ; then
+    usage
 else
-    echo "Not a single tag provided, defaulting to ${TAG}" >&2
+    TAG="${1:-${DEFAULT_IAMHERE_TAG}}"
 fi
 
-QUERY='SecurityGroupRules[?Description==`'"${TAG}"'`].[SecurityGroupRuleId,GroupId,IpProtocol,FromPort,ToPort]'
-NEWIP=$(curl -s http://whatismyip.akamai.com/)
+##
+
+test -z "${TAG}" && echo 'Aborted due to empty description' && exit 2
+test "${TAG}" == '-' && echo 'Aborted due to "-" description' && exit 3
+
+QUERY='SecurityGroupRules[?Description==`'"${TAG}"'`].[SecurityGroupRuleId,GroupId,IpProtocol,FromPort,ToPort,CidrIpv4]'
 
 let count=0
+prev_gid=''
 
-while read sgr gid IpProtocol FromPort ToPort
+while read sgr gid IpProtocol FromPort ToPort IP
 do
-    echo SecurityGroup Rule: ${sgr}
-    echo SecurityGroup Id: ${gid}
-
-    echo Change Ingress IP to ${NEWIP}
-
-    aws ec2 modify-security-group-rules \
-    --group-id ${gid} \
-    --security-group-rules "SecurityGroupRuleId=${sgr},SecurityGroupRule={Description=\"${TAG}\",IpProtocol=${IpProtocol},FromPort=${FromPort},ToPort=${ToPort},CidrIpv4=${NEWIP}/32}" > /dev/null
-    if [ $? -eq 0 ]
-    then
-        let count+=1
-        echo "Done"
-    else
-        echo "Failed"
+    if [[ ${gid} != ${prev_gid} ]] ; then
+        $VERBOSE && echo "SecurityGroup Id: ${gid}"
+        prev_gid=${gid}
     fi
+    $VERBOSE && echo -n "  SecurityGroup Rule ${sgr} : "
+
+    if [ ${IP} == "${NEWIP}" ] ; then
+      $VERBOSE && echo "current IP address already allowed"
+    else
+      $VERBOSE && echo -n "change Ingress IP to ${NEWIP} "
+
+      aws ec2 modify-security-group-rules \
+      --group-id ${gid} \
+      --security-group-rules "SecurityGroupRuleId=${sgr},SecurityGroupRule={Description=\"${TAG}\",IpProtocol=${IpProtocol},FromPort=${FromPort},ToPort=${ToPort},CidrIpv4=${NEWIP}}" > /dev/null
+      if [ $? -eq 0 ]
+      then
+        let count+=1
+        $VERBOSE && echo "successful."
+    else
+        echo "\nfailed to modify ${gid}/${sgr}" >&2
+    fi
+  fi
 done < <(aws ec2 describe-security-group-rules --query "${QUERY}" --output text)
 
-echo "${count} SecurityGroup Rules changed" >&2
-
-
+$VERBOSE && echo "${count} SecurityGroup Rules changed" >&2
+:
