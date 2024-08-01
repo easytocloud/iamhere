@@ -1,3 +1,5 @@
+![release workflow](https://github.com/easytocloud/iamhere/actions/workflows/release.yml/badge.svg)
+
 # iamhere
 tag-based change security group to allow traffic from your current IP address. 
 
