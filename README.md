@@ -1,16 +1,16 @@
 ![release workflow](https://github.com/easytocloud/iamhere/actions/workflows/release.yml/badge.svg)
 
 # iamhere
-tag-based change security group to allow traffic from your current IP address. 
 
-**BREAKING CHANGE** A previous version of iamhere modified a security group based on its name, this version changes security group *rules* within a security group, based on the description.
+Change security group to allow traffic from your current IP address.
 
 # sample usage 
 
 Create a security group in your AWS account.
 Create a security group rule in it that allows for http traffic from 
 address 127.0.0.1 and put the string *myHomeIP* (for example) in the description.
-That is the literal string, not your home IP address.
+
+Note: That is the literal string, not your home IP address.
 
 To change this security group to allow traffic not from 127.0.0.1, but from your current IP address, run
 
@@ -18,7 +18,7 @@ To change this security group to allow traffic not from 127.0.0.1, but from your
 iamhere myHomeIP
 ```
 
-Where ``iamhere`` is the name of the script in this repository and *HomeIP* is used to match the SG rule(s).
+Where ``iamhere`` is the name of the script in this repository and the string *myHomeIP* is used to match the SG rule(s).
 
 NOTE: *myHomeIP* is just an example, you should put a more usefull description!
 
@@ -34,7 +34,7 @@ iamhere supports two options:
  - -v for verbose, by default it does its work in silence
  - -c to remove your IP address from the rule and change it to 127.0.0.1 (essentially blocking external traffic)
 
-# environment
+# environment variables
 
 If your environment has a variable ``${DEFAULT_IAMHERE_TAG}`` this value is used when no arguments are passed.
 It defaults to myHomeIP.
@@ -47,5 +47,10 @@ In addition, it supports ``${AWS_DEFAULT_REGION}`` should you need to make modif
 Use homebrew or just copy iamhere from this repository to any directory in your ``${PATH}``
 
 ```
-homebrew install easytocloud/iamhere
+brew install easytocloud/tap/iamhere
 ```
+or just
+```
+brew install iamhere
+```
+if you already use our tap.
